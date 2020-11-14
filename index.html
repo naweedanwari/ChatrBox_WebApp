@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="utf-8">
+    <title>ChatrBOX</title>
+    <link rel='stylesheet' href='/style.css' />
+  </head>
+  <body>
+    <h1>ChatrBOX</h1>
+    <div id="content">
+      <div id="usersBox">
+        <ul id="users"><li style="font-weight:bold;font-size:25px;">Active users:</li></ul>
+      </div>
+      <div id="messagesBox">
+        <table style="height:100%; width:100%">
+          <tr>
+            <td style="vertical-align:bottom;">
+              <ul id="messages"></ul>
+            </td>
+          </tr>
+        </table>
+      </div>
+      <div id="typeBox">
+        <form action="">
+          <input id="m" autocomplete="off" /><button>Send</button>
+        </form>
+      </div>
+    </div>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://code.jquery.com/jquery-3.4.1.min.js"></script>
+    <script>
+      $(function () {
+        var socket = io();
+        $('form').submit(function(e) {
+          e.preventDefault(); // prevents page reloading
+          var line = $('#m').val();
+          if(line.charAt(0) === '/'){
+            if(line.startsWith("/color") === true){
+              socket.emit('change username color', line);
+            }else if (line.startsWith("/name") === true) {
+              socket.emit('change username', line);
+            }else{
+              var errMsg = "ERROR: \"" + line + "\" is not a valid command try\n";
+              errMsg += "\"/color RR,GG,BB\" to change color (RR,GG,BB are numbers from 0 to 255), or\n" ;
+              errMsg += "\"/name <new username>\" to change your username";
+              $('#messages').append($('<li>').text(errMsg));
+            }
+          }else{
+            socket.emit('chat message', line);
+          }
+          // clear the typing bar
+          $('#m').val('');
+          return false;
+        });
+        socket.on('chat message', function(msg){
+          if(msg[0] === "NULL"){
+              $('#messages').append($('<li>').html(msg[1]));
+          }else{
+            var styling = "<li" + msg[0] + ">";
+            $('#messages').append($(styling).html(msg[1]));
+          }
+
+          // scrolls the message box to the bottom, since it will
+          // only ever contain 200 messages, the 100000000000 value
+          // will always make it scroll to the bottom
+          $('#messagesBox').scrollTop(100000000000);
+        });
+        socket.on('update users list', function(msg){
+          for(var i = 0; i < msg.length; i++){
+                $('#users').append($('<li style="font-size:22px;">').html(msg[i]));
+          }
+        });
+        socket.on('empty users list', function(msg){
+          $('#users').empty()
+          var tmp = "Active users:";
+          $('#users').append($('<li style="font-weight:bold;font-size:25px;">').text(tmp));
+        });
+        socket.on('refresh messages', function(msg){
+          $('#messages').empty();
+          // try to get username from the cookie
+          var decodedCookie = decodeURIComponent(document.cookie);
+          var splitCookie = decodedCookie.split("=");
+          var SESSION_username = splitCookie[1];
+
+          for(var i = msg.length - 1; i > -1; i--){
+            if(msg[i].split("@")[1].includes(SESSION_username)){
+              $('#messages').append($('<li class="self">').html(msg[i]));
+            }else{
+              $('#messages').append($('<li>').html(msg[i]));
+            }
+          }
+        });
+        socket.on('make cookie', function(msg){
+          document.cookie = "username=" + msg + "; expires=Thu, 18 Dec 2020 12:00:00 UTC";
+        });
+        socket.on('check cookie', function(onlineUsers){
+          // try to get username from the cookie
+          var decodedCookie = decodeURIComponent(document.cookie);
+          var splitCookie = decodedCookie.split("=");
+          var SESSION_username = splitCookie[1];
+          var pickRandomName = false;
+
+          if(SESSION_username === undefined){
+            pickRandomName = true;
+          }else{
+            for(var i = 0; i < onlineUsers.length; i++){
+              if(SESSION_username === onlineUsers[i]){
+                pickRandomName = true
+              }
+            }
+          }
+
+          if(pickRandomName === true){
+            var counter = 0;
+            // else give the user the username Guest + the lowest free number
+            while(true){
+              SESSION_username = "Guest" + counter;
+              counter += 1;
+
+              if(onlineUsers.includes(SESSION_username) === false){
+                break;
+              }
+            }
+          }
+
+          document.cookie = "username=" + SESSION_username + ";" + " expires=Thu, 18 Dec 2020 12:00:00 UTC";
+          socket.emit('checked cookie', SESSION_username);
+        });
+      });
+    </script>
+  </body>
+</html>

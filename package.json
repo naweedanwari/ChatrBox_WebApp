@@ -1,0 +1,9 @@
+{
+  "name": "ChatrBOX",
+  "version": "0.0.1",
+  "description": "A chat room to talk about your passions",
+  "dependencies": {
+    "express": "^4.15.2",
+    "socket.io": "^3.0.1"
+  }
+}
